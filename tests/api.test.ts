@@ -12,6 +12,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { MissingEnvError } from "../src/lib/env";
 import { ApiError, handleRoute, ok, parseJsonBody } from "../src/lib/http";
 import { chatRequestSchema, parseLimit, scheduleUpdateSchema } from "../src/lib/validation";
 
@@ -154,5 +155,69 @@ describe("handleRoute", () => {
     assert.equal(raw.includes("postgresql://"), false, "must not leak a connection string");
     assert.equal(raw.includes("line 42"), false, "must not leak internals");
     assert.match(raw, /Something went wrong/);
+  });
+
+  it("maps a missing session to 401 with a message the UI can show", async () => {
+    const response = await handleRoute("test", async () => {
+      throw ApiError.unauthorized();
+    });
+    assert.equal(response.status, 401);
+    const body = await response.json();
+    assert.equal(body.error.code, "UNAUTHORIZED");
+    assert.match(body.error.message, /Sign in to continue/);
+  });
+
+  it("maps another senior's resource to 403, not 404", async () => {
+    // 403 is deliberate: the id exists, and pretending otherwise would make the
+    // dashboard's own "not found" state ambiguous.
+    const response = await handleRoute("test", async () => {
+      throw ApiError.forbidden();
+    });
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.error.code, "FORBIDDEN");
+  });
+
+  it("maps a missing environment variable to 503, naming it but never its value", async () => {
+    const response = await handleRoute("test", async () => {
+      throw new MissingEnvError("OPENAI_API_KEY");
+    });
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.error.code, "CONFIGURATION_ERROR");
+    // The operator needs the name to fix the deployment; the client learns nothing else.
+    assert.match(body.error.message, /missing OPENAI_API_KEY/);
+    assert.equal(body.error.details, undefined);
+  });
+
+  it("maps a database connection failure to 503 with a retryable message", async () => {
+    for (const code of ["P1001", "P1017", "ECONNREFUSED", "ENOTFOUND"]) {
+      const response = await handleRoute("test", async () => {
+        throw Object.assign(new Error("connect failed at postgresql://u:hunter2@db:5432"), { code });
+      });
+      assert.equal(response.status, 503, `expected 503 for ${code}`);
+      const raw = JSON.stringify(await response.json());
+      assert.match(raw, /SERVICE_UNAVAILABLE/);
+      assert.match(raw, /try again/i);
+      assert.equal(raw.includes("hunter2"), false, "must not leak the connection string");
+    }
+  });
+
+  it("treats a non-connection Prisma error as a generic 500", async () => {
+    // P2002 is a unique-constraint violation: a bug in our query, not an outage,
+    // and telling the client to "try again" would be wrong.
+    const response = await handleRoute("test", async () => {
+      throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+    });
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).error.code, "INTERNAL_ERROR");
+  });
+
+  it("collapses a thrown non-Error into a 500 rather than crashing", async () => {
+    const response = await handleRoute("test", async () => {
+      throw "just a string";
+    });
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).error.code, "INTERNAL_ERROR");
   });
 });
