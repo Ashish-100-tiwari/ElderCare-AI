@@ -1,4 +1,5 @@
 import { analyseMessage, replyForMood } from "./companion";
+import { istToday } from "@/lib/timezone";
 import type {
   Alert,
   Conversation,
@@ -32,12 +33,10 @@ import type {
 
 const WEBHOOK_ENDPOINT = "https://hooks.eldercare.ai/family/rahul-sharma";
 
+/** An India wall-clock time on a day relative to today, as a UTC ISO instant. */
 function todayAt(time: string, dayOffset = 0): string {
   const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setDate(date.getDate() + dayOffset);
-  date.setHours(hours ?? 0, minutes ?? 0, 0, 0);
-  return date.toISOString();
+  return istToday(hours ?? 0, minutes ?? 0, dayOffset).toISOString();
 }
 
 let idCounter = 0;

@@ -40,6 +40,30 @@ export const wellnessRequestSchema = z.strictObject({
   message: messageSchema,
 });
 
+/**
+ * POST /api/auth/login
+ *
+ * Shape only. There is no minimum-length or complexity rule here on purpose:
+ * this validates an *attempt* to sign in, and rejecting a short password with a
+ * different error than a wrong one tells an attacker something. The caps exist
+ * so a multi-megabyte body never reaches scrypt.
+ */
+export const signInSchema = z.strictObject({
+  // Trimmed and lowercased before the format check, so " Test@Gmail.com " is
+  // accepted and stored/compared in exactly one canonical form.
+  email: z
+    .string({ error: "email must be a string." })
+    .trim()
+    .min(1, "Email is required.")
+    .max(254, "Email is too long.")
+    .toLowerCase()
+    .pipe(z.email("Enter a valid email address.")),
+  password: z
+    .string({ error: "password must be a string." })
+    .min(1, "Password is required.")
+    .max(200, "Password is too long."),
+});
+
 /** PATCH /api/schedule/:id */
 export const scheduleUpdateSchema = z.strictObject({
   status: z.enum(ScheduleStatus, {

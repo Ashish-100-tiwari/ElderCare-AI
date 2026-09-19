@@ -5,6 +5,7 @@
  * renders from a single fetch instead of five.
  */
 
+import { requireSeniorAccess } from "@/lib/auth/session";
 import { handleRoute, ok } from "@/lib/http";
 import { parseRouteId } from "@/lib/validation";
 import { getCaregiverDashboard } from "@/services/caregiverService";
@@ -16,6 +17,10 @@ export async function GET(_request: Request, ctx: { params: Promise<{ seniorId: 
   return handleRoute("GET /api/caregiver/:seniorId/dashboard", async () => {
     const { seniorId: rawId } = await ctx.params;
     const seniorId = parseRouteId(rawId, "senior id");
+
+    // The family dashboard is the caregiver's view of the same senior, so the
+    // session's own seniorId is the one it is allowed to aggregate.
+    await requireSeniorAccess(seniorId);
 
     const dashboard = await getCaregiverDashboard(seniorId);
 

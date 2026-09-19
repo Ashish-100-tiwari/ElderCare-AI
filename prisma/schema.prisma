@@ -49,6 +49,12 @@ model Senior {
   name               String
   age                Int
   language           String
+  // Sign-in identity. Nullable because a senior can exist in demo data without
+  // an account, and because the column was added to a table that already had
+  // rows — a NOT NULL unique column cannot be backfilled in one migration.
+  // "Can sign in" means both fields are present.
+  email              String?  @unique
+  passwordHash       String?
   // Free-form companion hints ("Likes morning walks"). Fed to the model as context.
   preferences        String[]
   familyContactName  String

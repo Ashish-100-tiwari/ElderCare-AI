@@ -6,6 +6,7 @@ import { BookUser, LayoutDashboard, MessagesSquare, RotateCcw, UserCog } from "l
 import { useState } from "react";
 
 import { Logo } from "./Logo";
+import { SignOutButton } from "./SignOutButton";
 import { useElderCare } from "./providers/ElderCareProvider";
 import { LivePill } from "./ui/StatusPill";
 import { Skeleton } from "./ui/StateView";
@@ -85,6 +86,8 @@ export function CaregiverHeader() {
             >
               Senior view
             </Link>
+
+            <SignOutButton />
           </div>
         </div>
 

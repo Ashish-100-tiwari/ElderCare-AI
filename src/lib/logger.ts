@@ -21,6 +21,10 @@ export type LogEvent =
   | "webhook.result"
   | "voice.transcribe_failed"
   | "voice.speak_failed"
+  | "auth.signed_in"
+  | "auth.signed_out"
+  | "auth.failed"
+  | "auth.token.invalid"
   | "db.error"
   | "request.rejected"
   | "request.failed";

@@ -69,10 +69,18 @@ export function getAlerts(seniorId: string, limit = DEFAULT_ALERT_LIMIT) {
  *
  * Throws 404 for an unknown id rather than letting Prisma's P2025 surface as a
  * 500 — an invalid schedule id is a client mistake, not a server fault.
+ *
+ * `ownerSeniorId` scopes the write to the caller's own schedule. Another
+ * senior's row reads as 404, not 403: a schedule id is opaque, and confirming it
+ * exists would tell the caller something they should not learn from a guess.
  */
-export async function updateScheduleStatus(scheduleId: string, status: ScheduleStatus) {
-  const existing = await prisma.schedule.findUnique({
-    where: { id: scheduleId },
+export async function updateScheduleStatus(
+  scheduleId: string,
+  status: ScheduleStatus,
+  ownerSeniorId: string,
+) {
+  const existing = await prisma.schedule.findFirst({
+    where: { id: scheduleId, seniorId: ownerSeniorId },
     select: { id: true },
   });
   if (!existing) throw ApiError.notFound("Schedule item not found.");

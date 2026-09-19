@@ -1,3 +1,4 @@
+import { istClock, istDayMonth, istDaysBetween } from "./timezone";
 import type { ActivityKind, Mood, ScheduleStatus, Severity, WebhookStatus } from "./types";
 
 /** "07:30" -> "7:30 AM". Kept locale-independent so SSR and client agree. */
@@ -11,29 +12,31 @@ export function formatClock(time: string): string {
   return `${display}:${minutes.padStart(2, "0")} ${suffix}`;
 }
 
-/** ISO timestamp -> "10:32 AM". */
+/** ISO timestamp -> "10:32 AM", read in India time. */
 export function formatTimestamp(iso: string | null | undefined): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return formatClock(`${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`);
+  return formatClock(istClock(date));
 }
 
-/** ISO timestamp -> "Today, 10:32 AM" / "Yesterday, 9:10 PM" / "17 Sep, 9:10 PM". */
+/**
+ * ISO timestamp -> "Today, 10:32 AM" / "Yesterday, 9:10 PM" / "17 Sep, 9:10 PM".
+ *
+ * "Today" means today in India, so a 1am IST timestamp does not read as
+ * yesterday just because the server is still on the previous UTC day.
+ */
 export function formatDayAndTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
 
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const dayDiff = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  const dayDiff = istDaysBetween(date, new Date());
 
   if (dayDiff === 0) return `Today, ${formatTimestamp(iso)}`;
   if (dayDiff === 1) return `Yesterday, ${formatTimestamp(iso)}`;
 
-  const day = date.getDate();
-  const month = date.toLocaleString("en-US", { month: "short" });
-  return `${day} ${month}, ${formatTimestamp(iso)}`;
+  return `${istDayMonth(date)}, ${formatTimestamp(iso)}`;
 }
 
 /** Seconds -> "09:58". */

@@ -30,6 +30,7 @@ import "server-only";
 import { headers } from "next/headers";
 
 import { getSenior as getDemoSenior } from "@/lib/server/store";
+import { istClock } from "@/lib/timezone";
 import type {
   ActivityKind,
   Alert,
@@ -85,6 +86,24 @@ interface CallOptions {
   body?: unknown;
 }
 
+/**
+ * The caller's session cookie, so a server-to-server call to our own backend
+ * routes arrives authenticated.
+ *
+ * Without this the BFF's fetch is anonymous, the backend answers 401, and `call`
+ * quietly falls back to the demo store — the UI would look like it worked while
+ * showing fabricated data. Only sent when the backend is this same app; an
+ * external BACKEND_API_URL gets the bearer key instead and has no business
+ * seeing our cookie.
+ */
+async function sessionCookieHeader(): Promise<Record<string, string>> {
+  if (EXTERNAL_URL) return {};
+
+  const incoming = await headers();
+  const cookie = incoming.get("cookie");
+  return cookie ? { cookie } : {};
+}
+
 /** One backend call. `null` means "fall back to the demo store". */
 async function call<T>(path: string, options: CallOptions = {}): Promise<T | null> {
   const base = await baseUrl();
@@ -99,6 +118,7 @@ async function call<T>(path: string, options: CallOptions = {}): Promise<T | nul
       headers: {
         "Content-Type": "application/json",
         ...(API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}),
+        ...(await sessionCookieHeader()),
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: "no-store",
@@ -233,8 +253,7 @@ const defaultDurations: Record<ActivityKind, number> = {
 };
 
 function toClock(iso: string): string {
-  const date = new Date(iso);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return istClock(new Date(iso));
 }
 
 function toScheduleItem(item: WireSchedule): ScheduleItem {

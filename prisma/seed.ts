@@ -11,11 +11,27 @@
 import { config as loadEnv } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, ScheduleStatus } from "../src/generated/prisma";
+import { istToday } from "../src/lib/timezone";
+import { hashPassword } from "../src/lib/auth/password";
 
 loadEnv({ path: ".env.local", quiet: true });
 loadEnv({ path: ".env", quiet: true });
 
 const SENIOR_ID = "senior-001";
+
+/**
+ * Demo sign-in credentials.
+ *
+ * Re-hashed on every seed, so `prisma db seed` always restores a login that
+ * works — including after someone has been poking at the row by hand. A fresh
+ * salt each run means the stored hash differs every time, which is correct: the
+ * hash is not the identity, the password is.
+ *
+ * These are demo credentials in a demo database. A real deployment would invite
+ * the user to set their own and never put a password in source control.
+ */
+const SENIOR_EMAIL = "test@gmail.com";
+const SENIOR_PASSWORD = "123@Test";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -25,11 +41,15 @@ if (!connectionString) {
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
-/** Today's date at a local wall-clock time. */
+/**
+ * Today's date at an India wall-clock time.
+ *
+ * The hours below are the times the senior sees, so they are resolved in IST
+ * rather than in whatever zone the machine running the seed happens to be in.
+ * Otherwise seeding from a UTC container would put "Wake Up" at 12:30pm.
+ */
 function todayAt(hour: number, minute = 0): Date {
-  const date = new Date();
-  date.setHours(hour, minute, 0, 0);
-  return date;
+  return istToday(hour, minute);
 }
 
 const SCHEDULE: Array<{ hour: number; minute: number; activity: string; description: string }> = [
@@ -62,12 +82,16 @@ const SAMPLE_CONVERSATIONS: Array<{ hour: number; userMessage: string; aiRespons
 async function main() {
   console.log("Seeding ElderCare AI demo data…");
 
+  const passwordHash = await hashPassword(SENIOR_PASSWORD);
+
   const senior = await prisma.senior.upsert({
     where: { id: SENIOR_ID },
     update: {
       name: "Rajesh Sharma",
       age: 72,
       language: "Hindi",
+      email: SENIOR_EMAIL,
+      passwordHash,
       preferences: [
         "Likes morning walks",
         "Likes devotional music",
@@ -82,6 +106,8 @@ async function main() {
       name: "Rajesh Sharma",
       age: 72,
       language: "Hindi",
+      email: SENIOR_EMAIL,
+      passwordHash,
       preferences: [
         "Likes morning walks",
         "Likes devotional music",
@@ -95,10 +121,11 @@ async function main() {
     },
   });
 
-  // Rebuild today's schedule only — past days stay as history.
+  // Rebuild today's schedule only — past days stay as history. "Today" is the
+  // India calendar day, matching `lib/date.ts` so the seed writes into exactly
+  // the window the app later reads back.
   const startOfDay = todayAt(0, 0);
-  const startOfTomorrow = new Date(startOfDay);
-  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+  const startOfTomorrow = new Date(startOfDay.getTime() + 86_400_000);
 
   const { count: removed } = await prisma.schedule.deleteMany({
     where: { seniorId: senior.id, scheduledTime: { gte: startOfDay, lt: startOfTomorrow } },
@@ -139,6 +166,7 @@ async function main() {
   console.log(`  senior:        ${senior.name} (${senior.id})`);
   console.log(`  schedule:      ${scheduleCount} activities for today (replaced ${removed})`);
   console.log(`  conversations: ${conversationCount}`);
+  console.log(`  sign in as:    ${SENIOR_EMAIL} / ${SENIOR_PASSWORD}`);
   console.log("Done.");
 }
 

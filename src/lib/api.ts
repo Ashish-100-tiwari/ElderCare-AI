@@ -60,6 +60,23 @@ async function request<T>(
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string; detail?: string } | null;
+
+    // A session that expired while the tab was open. Nothing the UI can do with
+    // this error is useful — a retry button would fail identically — so send the
+    // user to sign in and keep where they were, then still throw so the caller's
+    // loading state resolves rather than hanging during the navigation.
+    if (response.status === 401 && typeof window !== "undefined") {
+      const here = `${window.location.pathname}${window.location.search}`;
+      if (!window.location.pathname.startsWith("/signin")) {
+        // A hard navigation, deliberately. This module is not a component, so
+        // there is no router to reach for — and a full load is what we want
+        // anyway: it discards every cached response and piece of client state
+        // belonging to the session that just ended.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign(`/signin?redirect=${encodeURIComponent(here)}`);
+      }
+    }
+
     throw new ApiError(body?.error ?? `Request failed (${response.status})`, response.status, body?.detail);
   }
 

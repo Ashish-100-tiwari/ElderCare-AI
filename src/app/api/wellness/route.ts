@@ -10,6 +10,7 @@
  * the two paths can never disagree and a client cannot manufacture a HIGH alert.
  */
 
+import { requireSeniorAccess } from "@/lib/auth/session";
 import { handleRoute, ok, parseJsonBody } from "@/lib/http";
 import { wellnessRequestSchema } from "@/lib/validation";
 import { getSeniorForAlerting } from "@/services/knowledgeBaseService";
@@ -22,6 +23,10 @@ export async function POST(request: Request) {
   return handleRoute("POST /api/wellness", async () => {
     const body = await parseJsonBody(request);
     const { seniorId, message } = wellnessRequestSchema.parse(body);
+
+    // This endpoint can raise a family alert, so it is exactly the one nobody
+    // unauthenticated should be able to reach.
+    await requireSeniorAccess(seniorId);
 
     // 404 on an unknown senior before writing anything.
     const senior = await getSeniorForAlerting(seniorId);

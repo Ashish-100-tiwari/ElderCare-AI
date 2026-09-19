@@ -48,13 +48,26 @@ export const env = {
   openaiTtsModel: () => read("OPENAI_TTS_MODEL") ?? "gpt-4o-mini-tts",
 
   /**
-   * Which voice Asha speaks with. `coral` is warm and unhurried; `alloy` and
-   * `shimmer` are the other two that hold up at a slow speaking rate.
+   * Which voice Asha speaks with.
+   *
+   * Asha is a woman, so this must be a feminine voice: `coral` (warm and
+   * unhurried, the default), `shimmer`, `sage` or `nova`. `alloy`, `ash`,
+   * `echo`, `onyx` and `fable` read as male or neutral and would contradict how
+   * the companion is introduced everywhere else in the UI.
+   *
+   * The browser fallback picks its own female voice — see `lib/voice/femaleVoice.ts`.
    */
   openaiTtsVoice: () => read("OPENAI_TTS_VOICE") ?? "coral",
 
   /** Family webhook. Optional by design — absence means "simulate", not "fail". */
   familyWebhookUrl: () => read("FAMILY_WEBHOOK_URL"),
+
+  /**
+   * HMAC key for session tokens. Required — there is deliberately no fallback:
+   * a default would let a deployment ship with a signing key an attacker
+   * already knows, and forging a session is worse than failing to sign in.
+   */
+  authSecret: () => requireEnv("AUTH_SECRET"),
 
   isProduction: () => process.env.NODE_ENV === "production",
 } as const;

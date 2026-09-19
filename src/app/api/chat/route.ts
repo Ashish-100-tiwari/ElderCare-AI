@@ -5,6 +5,7 @@
  * flow lives in chatService so it can be read in one place.
  */
 
+import { requireSeniorAccess } from "@/lib/auth/session";
 import { ApiError, handleRoute, ok, parseJsonBody } from "@/lib/http";
 import { chatRequestSchema } from "@/lib/validation";
 import { handleChat } from "@/services/chatService";
@@ -22,6 +23,11 @@ export async function POST(request: Request) {
      * `wellnessAlert`, `severity` or `category` — the backend decides those.
      */
     const { seniorId, message } = chatRequestSchema.parse(body);
+
+    // Checked before the model is called: an unauthorised request should cost
+    // nothing, and a stranger must not be able to append to this senior's
+    // conversation history.
+    await requireSeniorAccess(seniorId);
 
     try {
       const result = await handleChat({ seniorId, message });

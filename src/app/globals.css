@@ -127,6 +127,49 @@
     border: 3px solid transparent;
     background-clip: content-box;
   }
+
+  /*
+   * Ambient warmth for the full-height standalone screens (landing, sign-in).
+   * Two very soft washes over the canvas colour, so a page that is mostly empty
+   * space does not read as a flat sheet of beige. Fixed attachment keeps the
+   * light source still while the page scrolls under it.
+   */
+  .page-aura {
+    background-image:
+      radial-gradient(60rem 38rem at 8% -12%, rgb(167 235 221 / 0.5), transparent 70%),
+      radial-gradient(46rem 30rem at 102% 2%, rgb(248 220 155 / 0.38), transparent 68%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+}
+
+/*
+ * A single gentle entrance, used to bring a screen in rather than snap it in.
+ * `both` keeps the final state applied, which also makes the reduced-motion
+ * override below a no-op rather than a flash: the animation still "runs", just
+ * in 0.001ms, and settles on the same values.
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.75rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Longhands, not the `animation` shorthand: the shorthand resets
+ * `animation-delay` to 0s, which would silently swallow the `[animation-delay:*]`
+ * utilities the screens use to stagger their entrance.
+ */
+.animate-rise-in {
+  animation-name: rise-in;
+  animation-duration: 0.55s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
 }
 
 /* Senior-facing surfaces opt into a larger base size for effortless reading. */
@@ -149,6 +192,9 @@
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    /* Without this, a staggered entrance leaves content invisible for the length
+       of its delay — motion removed, but the flicker kept. */
+    animation-delay: 0s !important;
     transition-duration: 0.001ms !important;
   }
 }

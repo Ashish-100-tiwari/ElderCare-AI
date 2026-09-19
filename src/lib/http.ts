@@ -17,6 +17,8 @@ import { log } from "@/lib/logger";
 export type ErrorCode =
   | "VALIDATION_ERROR"
   | "INVALID_JSON"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
   | "NOT_FOUND"
   | "SERVICE_UNAVAILABLE"
   | "CONFIGURATION_ERROR"
@@ -40,6 +42,16 @@ export class ApiError extends Error {
 
   static notFound(message: string) {
     return new ApiError(404, "NOT_FOUND", message);
+  }
+
+  /** No usable session. The client's cue to send the user to /signin. */
+  static unauthorized(message = "Sign in to continue.") {
+    return new ApiError(401, "UNAUTHORIZED", message);
+  }
+
+  /** Signed in, but not as someone allowed to touch this resource. */
+  static forbidden(message = "You do not have access to this resource.") {
+    return new ApiError(403, "FORBIDDEN", message);
   }
 }
 

@@ -10,11 +10,31 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 
+import { SESSION_COOKIE } from "../src/lib/auth/session-cookie";
+import { signSessionToken } from "../src/lib/auth/token";
 import { audioFilename } from "../src/services/openaiService";
 import { POST as speak } from "../src/app/api/bff/voice/speak/route";
 import { POST as transcribe } from "../src/app/api/bff/voice/transcribe/route";
+
+/**
+ * Every `/api/bff/*` route requires a session, so the guard tests have to send
+ * one — otherwise they would all pass for the wrong reason, asserting 401 where
+ * they mean to assert 400.
+ */
+let cookie = "";
+
+before(async () => {
+  process.env.AUTH_SECRET ??= "test-secret-for-the-suite-only-not-a-real-key";
+  const token = await signSessionToken({
+    seniorId: "senior-001",
+    email: "test@gmail.com",
+    name: "Rajesh Sharma",
+    role: "senior",
+  });
+  cookie = `${SESSION_COOKIE}=${token}`;
+});
 
 function blob(type: string, bytes = 4096): Blob {
   return new Blob([new Uint8Array(bytes)], { type });
@@ -27,13 +47,17 @@ function upload(fields: Record<string, string | Blob>, filename?: string): Reque
     if (value instanceof Blob && filename) form.append(key, value, filename);
     else form.append(key, value);
   }
-  return new Request("http://localhost/api/bff/voice/transcribe", { method: "POST", body: form });
+  return new Request("http://localhost/api/bff/voice/transcribe", {
+    method: "POST",
+    headers: { cookie },
+    body: form,
+  });
 }
 
 function speakRequest(body: unknown): Request {
   return new Request("http://localhost/api/bff/voice/speak", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", cookie },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
@@ -110,12 +134,49 @@ describe("POST /api/bff/voice/transcribe — guards", () => {
     const response = await transcribe(
       new Request("http://localhost/api/bff/voice/transcribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", cookie },
         body: '{"audio":"nope"}',
       }),
     );
     assert.equal(response.status, 400);
     assert.equal(((await response.json()) as { reason: string }).reason, "malformed_form_data");
+  });
+
+  it("answers 401 without a session, before spending anything on the clip", async () => {
+    const form = new FormData();
+    form.append("audio", blob("audio/webm"), "speech.webm");
+    const response = await transcribe(
+      new Request("http://localhost/api/bff/voice/transcribe", { method: "POST", body: form }),
+    );
+    assert.equal(response.status, 401);
+    assert.equal(((await response.json()) as { code: string }).code, "UNAUTHORIZED");
+  });
+
+  it("answers 401 for a cookie signed with someone else's secret", async () => {
+    const original = process.env.AUTH_SECRET;
+    let forged: string;
+    try {
+      process.env.AUTH_SECRET = "an-attackers-own-signing-key";
+      forged = await signSessionToken({
+        seniorId: "senior-001",
+        email: "test@gmail.com",
+        name: "Rajesh Sharma",
+        role: "senior",
+      });
+    } finally {
+      process.env.AUTH_SECRET = original;
+    }
+
+    const form = new FormData();
+    form.append("audio", blob("audio/webm"), "speech.webm");
+    const response = await transcribe(
+      new Request("http://localhost/api/bff/voice/transcribe", {
+        method: "POST",
+        headers: { cookie: `${SESSION_COOKIE}=${forged}` },
+        body: form,
+      }),
+    );
+    assert.equal(response.status, 401);
   });
 
   it("always answers with a text field, so the client never reads undefined", async () => {

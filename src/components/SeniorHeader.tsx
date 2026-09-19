@@ -4,10 +4,12 @@ import Link from "next/link";
 import { UserRound } from "lucide-react";
 
 import { Logo } from "./Logo";
+import { SignOutButton } from "./SignOutButton";
 import { useElderCare } from "./providers/ElderCareProvider";
 import { Skeleton } from "./ui/StateView";
 import { formatClock, greetingForHour } from "@/lib/format";
 import { useNow } from "@/lib/hooks/useNow";
+import { istClock, istHour } from "@/lib/timezone";
 
 /**
  * Senior header: identity on the left, a warm greeting in the middle, the
@@ -18,10 +20,10 @@ export function SeniorHeader() {
   const now = useNow(15_000);
 
   const firstName = senior.data?.firstName;
-  const greeting = now ? greetingForHour(now.getHours()) : "Hello";
-  const clock = now
-    ? formatClock(`${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`)
-    : null;
+  // India time, not the device's: the clock should read the same whether the
+  // senior's tablet is set correctly or their family is checking in from abroad.
+  const greeting = now ? greetingForHour(istHour(now)) : "Hello";
+  const clock = now ? formatClock(istClock(now)) : null;
 
   return (
     <header className="sticky top-0 z-30 border-b-2 border-ink-200/80 bg-canvas/90 backdrop-blur-md">
@@ -56,6 +58,8 @@ export function SeniorHeader() {
           >
             <UserRound size={28} aria-hidden="true" />
           </Link>
+
+          <SignOutButton size="lg" />
         </div>
       </div>
     </header>

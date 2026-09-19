@@ -15,6 +15,7 @@ import type { CompanionState } from "@/lib/avatar/types";
 import { formatClock, greetingForHour } from "@/lib/format";
 import { useNow } from "@/lib/hooks/useNow";
 import { useVoiceOutput } from "@/lib/hooks/useVoice";
+import { istHour } from "@/lib/timezone";
 
 export default function SeniorDashboardPage() {
   const { senior, schedule, setScheduleStatus, meditationDoneToday, preferences } = useElderCare();
@@ -30,7 +31,7 @@ export default function SeniorDashboardPage() {
 
   /** The companion's opening line — reacts to what's actually next today. */
   const companionMessage = useMemo(() => {
-    const greeting = now ? greetingForHour(now.getHours()) : "Good Morning";
+    const greeting = now ? greetingForHour(istHour(now)) : "Good Morning";
     const nextItem = schedule.data?.find((item) => item.status !== "completed");
 
     if (!nextItem) {
@@ -84,20 +85,24 @@ export default function SeniorDashboardPage() {
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-12">
         {/* ------------------------------------------------ virtual human */}
-        <Card tone="senior" padding="lg" className="lg:col-span-7">
+        <Card
+          tone="senior"
+          padding="lg"
+          className="animate-rise-in bg-gradient-to-b from-white to-calm-50/40 lg:col-span-7"
+        >
           <div className="flex flex-col items-center">
             <VirtualCompanion state={avatarState} companionName="Asha" size="lg" />
 
-            <div className="mt-6 w-full rounded-4xl border-2 border-calm-200 bg-calm-50/80 p-5 sm:p-6">
+            <div className="mt-6 w-full rounded-4xl border-2 border-calm-200 bg-calm-50/80 bg-gradient-to-br from-white via-calm-50 to-calm-100/70 p-5 shadow-soft sm:p-6">
               <div className="flex items-start justify-between gap-4">
-                <p className="whitespace-pre-line text-balance text-2xl font-semibold leading-snug text-ink-900 sm:text-3xl">
+                <p className="whitespace-pre-line text-balance text-2xl font-semibold leading-snug tracking-tight text-ink-900 sm:text-3xl">
                   {companionMessage}
                 </p>
                 <button
                   type="button"
                   onClick={() => speech.speak(companionMessage.replace(/\n/g, " "))}
                   disabled={!speech.supported}
-                  className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-calm-300 bg-white text-calm-700 transition-colors hover:bg-calm-100 disabled:opacity-40"
+                  className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-calm-300 bg-white text-calm-700 shadow-soft transition-all hover:border-calm-500 hover:bg-calm-100 active:translate-y-px disabled:opacity-40 disabled:shadow-none"
                   aria-label="Read this message aloud"
                   title="Read aloud"
                 >
@@ -106,7 +111,7 @@ export default function SeniorDashboardPage() {
               </div>
 
               {meditationDoneToday ? (
-                <p className="mt-3 inline-flex items-center gap-2 text-lg font-semibold text-calm-700">
+                <p className="animate-rise-in mt-4 inline-flex items-center gap-2 rounded-full border border-calm-200 bg-white/80 px-3.5 py-1.5 text-lg font-semibold text-calm-700">
                   <Sparkles size={20} aria-hidden="true" />
                   Meditation completed today. Well done.
                 </p>
@@ -120,7 +125,7 @@ export default function SeniorDashboardPage() {
                 onClick={openConversation}
                 icon={<MessageCircle size={30} />}
                 fullWidth
-                className="sm:flex-col sm:gap-2 sm:px-4 sm:text-xl"
+                className="sm:min-h-[6.5rem] sm:flex-col sm:gap-2 sm:px-4 sm:text-xl hover:-translate-y-0.5 hover:shadow-lift"
               >
                 Talk to Me
               </BigButton>
@@ -131,7 +136,7 @@ export default function SeniorDashboardPage() {
                 variant="warm"
                 icon={<Sparkles size={30} />}
                 fullWidth
-                className="sm:flex-col sm:gap-2 sm:px-4 sm:text-xl"
+                className="sm:min-h-[6.5rem] sm:flex-col sm:gap-2 sm:px-4 sm:text-xl hover:-translate-y-0.5 hover:shadow-lift"
               >
                 Start Meditation
               </BigLinkButton>
@@ -142,7 +147,7 @@ export default function SeniorDashboardPage() {
                 variant="secondary"
                 icon={<CalendarDays size={30} />}
                 fullWidth
-                className="sm:flex-col sm:gap-2 sm:px-4 sm:text-xl"
+                className="sm:min-h-[6.5rem] sm:flex-col sm:gap-2 sm:px-4 sm:text-xl hover:-translate-y-0.5 hover:shadow-lift"
               >
                 My Schedule
               </BigLinkButton>
@@ -151,7 +156,11 @@ export default function SeniorDashboardPage() {
         </Card>
 
         {/* ---------------------------------------------------- schedule */}
-        <Card tone="senior" padding="lg" className="lg:col-span-5">
+        <Card
+          tone="senior"
+          padding="lg"
+          className="animate-rise-in lg:col-span-5 [animation-delay:90ms]"
+        >
           <CardHeader
             tone="senior"
             title="Today's Schedule"
@@ -178,7 +187,11 @@ export default function SeniorDashboardPage() {
       </div>
 
       {/* ------------------------------------------------- wellness check */}
-      <Card tone="senior" padding="lg">
+      <Card
+        tone="senior"
+        padding="lg"
+        className="animate-rise-in bg-gradient-to-b from-white to-warm-50/50 [animation-delay:180ms]"
+      >
         <WellnessCheck onTalkAboutIt={openConversation} />
       </Card>
 
@@ -192,7 +205,7 @@ export default function SeniorDashboardPage() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.3 }}
           >
-            <Card tone="senior" padding="lg">
+            <Card tone="senior" padding="lg" className="shadow-lift">
               <CardHeader
                 tone="senior"
                 title="Talk to Asha"
@@ -202,7 +215,7 @@ export default function SeniorDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setTalking(false)}
-                    className="grid size-12 place-items-center rounded-full border-2 border-ink-300 bg-white text-ink-700 hover:bg-ink-100"
+                    className="grid size-12 place-items-center rounded-full border-2 border-ink-300 bg-white text-ink-700 transition-colors hover:border-ink-400 hover:bg-ink-100"
                     aria-label="Close the conversation"
                   >
                     <X size={24} aria-hidden="true" />

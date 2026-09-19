@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { pickFemaleVoice } from "@/lib/voice/femaleVoice";
+
 /**
  * Thin wrappers around the browser's built-in speech APIs.
  *
@@ -167,10 +169,36 @@ export function useSpeechSynthesis(enabled = true): UseSpeechSynthesisResult {
   const [supported, setSupported] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
+  /**
+   * The chosen female voice, in a ref rather than state: it is read inside
+   * `speak` and must not cause a re-render, or change `speak`'s identity and
+   * retrigger the callers' greeting effects.
+   */
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
   useEffect(() => {
     // Same reason as above: capability detection belongs after hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+  }, []);
+
+  // Asha is a woman, so pick a woman's voice. Without this the utterance gets
+  // the platform default, which is male on most Linux and Windows installs.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const synth = window.speechSynthesis;
+    const choose = () => {
+      const voices = synth.getVoices();
+      // Chrome populates the list asynchronously and returns [] on the first
+      // call, hence the voiceschanged listener below.
+      if (voices.length === 0) return;
+      voiceRef.current = (pickFemaleVoice(voices) as SpeechSynthesisVoice | null) ?? null;
+    };
+
+    choose();
+    synth.addEventListener("voiceschanged", choose);
+    return () => synth.removeEventListener("voiceschanged", choose);
   }, []);
 
   // Stop any in-flight narration when the component unmounts.
@@ -190,7 +218,20 @@ export function useSpeechSynthesis(enabled = true): UseSpeechSynthesisResult {
       const utterance = new SpeechSynthesisUtterance(text);
       // Slightly slower and warmer than default — easier for seniors to follow.
       utterance.rate = 0.92;
-      utterance.pitch = 1.02;
+
+      const voice = voiceRef.current;
+      if (voice) {
+        utterance.voice = voice;
+        // Some engines ignore `voice` unless `lang` agrees with it.
+        utterance.lang = voice.lang;
+        utterance.pitch = 1.02;
+      } else {
+        // No recognisably female voice installed. Keep the default rather than
+        // stay silent, but lift the pitch — it reads as less male on the flat
+        // espeak voices that are usually what is left at this point.
+        utterance.pitch = 1.35;
+      }
+
       utterance.onstart = () => setSpeaking(true);
       utterance.onend = () => setSpeaking(false);
       utterance.onerror = () => setSpeaking(false);
