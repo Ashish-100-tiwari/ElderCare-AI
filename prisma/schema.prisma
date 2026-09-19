@@ -1,0 +1,119 @@
+// ElderCare AI — database schema
+// Postgres + Prisma. Kept deliberately small: five models, four enums.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: the connection URL lives in prisma.config.ts (CLI) and is passed to
+// PrismaClient via the pg driver adapter at runtime (src/lib/prisma.ts).
+datasource db {
+  provider = "postgresql"
+}
+
+enum ScheduleStatus {
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum WellnessCategory {
+  GENERAL
+  DISCOMFORT
+  EMOTIONAL
+  OTHER
+}
+
+enum WellnessSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AlertType {
+  DISCOMFORT_REPORTED
+  WELLNESS_CONCERN
+}
+
+enum WebhookStatus {
+  PENDING
+  SENT
+  FAILED
+  SIMULATED
+}
+
+model Senior {
+  id                 String   @id @default(cuid())
+  name               String
+  age                Int
+  language           String
+  // Free-form companion hints ("Likes morning walks"). Fed to the model as context.
+  preferences        String[]
+  familyContactName  String
+  familyContactPhone String
+  // Per-senior override. Falls back to FAMILY_WEBHOOK_URL when null.
+  familyWebhookUrl   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  schedules        Schedule[]
+  conversations    Conversation[]
+  wellnessReports  WellnessReport[]
+  alerts           Alert[]
+}
+
+model Schedule {
+  id            String         @id @default(cuid())
+  seniorId      String
+  activity      String
+  description   String
+  scheduledTime DateTime
+  status        ScheduleStatus @default(UPCOMING)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  senior Senior @relation(fields: [seniorId], references: [id], onDelete: Cascade)
+
+  @@index([seniorId, scheduledTime])
+}
+
+model Conversation {
+  id          String   @id @default(cuid())
+  seniorId    String
+  userMessage String
+  aiResponse  String
+  createdAt   DateTime @default(now())
+
+  senior Senior @relation(fields: [seniorId], references: [id], onDelete: Cascade)
+
+  @@index([seniorId, createdAt])
+}
+
+model WellnessReport {
+  id       String           @id @default(cuid())
+  seniorId String
+  // Verbatim quote of what the senior said. Never a diagnosis.
+  message  String
+  category WellnessCategory
+  severity WellnessSeverity
+  createdAt DateTime        @default(now())
+
+  senior Senior @relation(fields: [seniorId], references: [id], onDelete: Cascade)
+
+  @@index([seniorId, createdAt])
+}
+
+model Alert {
+  id            String        @id @default(cuid())
+  seniorId      String
+  type          AlertType
+  message       String
+  webhookStatus WebhookStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+
+  senior Senior @relation(fields: [seniorId], references: [id], onDelete: Cascade)
+
+  @@index([seniorId, createdAt])
+}

@@ -1,0 +1,24 @@
+# Local Postgres for ElderCare AI.
+#   docker compose up -d
+#   npx prisma migrate dev
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: eldercare-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: eldercare
+      POSTGRES_DB: eldercare
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d eldercare"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
